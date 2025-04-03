@@ -80,6 +80,71 @@ Output:
 >@guofei9987 开源万岁！
 
 
+## 带元数据的文本水印
+
+我们提供了更简单的API用于嵌入和提取文本水印。这些方法还支持将水印存储在图像元数据中，以提高水印的鲁棒性。
+
+### 嵌入文本水印：
+
+```python
+from blind_watermark import WaterMark
+
+# 初始化水印对象
+wm = WaterMark()
+
+# 嵌入文本水印
+wm.embed_text(
+    text="这是一个支持元数据的水印",
+    filename="pic/ori_img.jpg",
+    out_filename="output/embedded_with_metadata.png",
+    use_metadata=True  # 启用元数据水印（默认为True）
+)
+```
+
+该函数将：
+1. 使用鲁棒算法将文本水印嵌入到图像像素中
+2. 同时将相同的水印存储在图像元数据中（如果use_metadata=True）
+3. 支持多种图像格式：
+   - PNG, TIFF：使用标准元数据
+   - JPG/JPEG：使用EXIF元数据（需要`piexif`库）
+
+### 提取文本水印：
+
+```python
+from blind_watermark import WaterMark
+
+# 初始化水印对象
+wm = WaterMark()
+
+# 提取文本水印
+extracted_text = wm.extract_text(
+    filename="output/embedded_with_metadata.png",
+    check_metadata=True  # 首先尝试元数据，然后是像素水印（默认为True）
+)
+
+print(extracted_text)
+```
+
+该函数将：
+1. 如果check_metadata=True，首先尝试从元数据中提取水印
+2. 如果元数据提取失败或不可用，回退到从像素中提取
+3. 支持多种图像格式，包括PNG, TIFF, JPG/JPEG
+
+### 功能和优势：
+
+- **双重保护**：水印同时存储在像素和元数据中
+- **格式支持**：适用于PNG, TIFF, JPG/JPEG图像格式
+- **错误纠正**：使用Reed-Solomon编码进行错误纠正
+- **压缩**：应用zlib压缩以存储更多信息
+- **自动恢复**：如果元数据损坏，会回退到像素提取
+
+### JPEG元数据支持依赖：
+
+要在JPEG图像中启用元数据水印，需要安装piexif库：
+```bash
+pip install piexif
+```
+
 ### 各种攻击后的效果
 
 |攻击方式|攻击后的图片|提取的水印|

@@ -1,0 +1,6 @@
+from blind_watermark.blind_watermark import WaterMark
+
+wm=WaterMark()
+wm.embed_text("kdpowqkokxoemcopwmopwmqxopqewoximopqwmjxoirmqwioemoimqxipormxrpiqmwepomxpoiweqmxpomewqpomxowqmeopimqwopmxeopiwqmxpoirmqwpeomxpowqmepxmqpwmxpoiwqmeixopmqwxiopmasdfopspa,xpo,xop,ksopxopa,xpopxpoa,xpo,eapo,xpow,xpoe,wa,ex,iopawjeifiwaefoawmnfiomwaofemiowmfiowemfoiawmiofiowjefojwaeiofpjwioajefiowjifojwoajeiofjwiojefioewajefioejwaeoijaiwoejfoiawnefonamwuienfpawnfepawonfeoiawnfpawnefopnawoeifnowaenfpowe","20.2.png","test_embed.png")
+print(wm.extract_text("test_embed.png"))
+

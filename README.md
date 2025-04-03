@@ -83,6 +83,72 @@ print(wm_extract)
 Output:
 >@guofei9987 开源万岁！
 
+
+## Text Watermark with Metadata
+
+We provide a simpler API for embedding and extracting text watermarks. These methods also support storing watermarks in image metadata for better robustness.
+
+### Embed text watermark:
+
+```python
+from blind_watermark import WaterMark
+
+# Initialize watermark object
+wm = WaterMark()
+
+# Embed text watermark
+wm.embed_text(
+    text="This is a watermark with metadata support",
+    filename="pic/ori_img.jpg",
+    out_filename="output/embedded_with_metadata.png",
+    use_metadata=True  # Enable metadata watermarking (default is True)
+)
+```
+
+This function will:
+1. Embed the text watermark into image pixels using robust algorithms
+2. Store the same watermark in image metadata (if use_metadata=True)
+3. Support various image formats:
+   - PNG, TIFF: Uses standard metadata
+   - JPG/JPEG: Uses EXIF metadata (requires `piexif` library)
+
+### Extract text watermark:
+
+```python
+from blind_watermark import WaterMark
+
+# Initialize watermark object
+wm = WaterMark()
+
+# Extract text watermark
+extracted_text = wm.extract_text(
+    filename="output/embedded_with_metadata.png",
+    check_metadata=True  # Try metadata first, then pixel watermark (default is True)
+)
+
+print(extracted_text)
+```
+
+This function will:
+1. First try to extract the watermark from metadata if check_metadata=True
+2. If metadata extraction fails or is unavailable, fall back to extracting from pixels
+3. Support various image formats including PNG, TIFF, JPG/JPEG
+
+### Features and Benefits:
+
+- **Dual Protection**: Stores watermark in both pixels and metadata
+- **Format Support**: Works with PNG, TIFF, JPG/JPEG image formats
+- **Error Correction**: Uses Reed-Solomon coding for error correction
+- **Compression**: Applies zlib compression to store more information
+- **Automatic Recovery**: Falls back to pixel extraction if metadata is damaged
+
+### Dependencies for JPEG Metadata Support:
+
+To enable metadata watermarking in JPEG images, install the piexif library:
+```bash
+pip install piexif
+```
+
 ### attacks on Watermarked Image
 
 
