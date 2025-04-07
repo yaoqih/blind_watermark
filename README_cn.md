@@ -236,3 +236,70 @@ WaterMark(..., processes=None)
 
 - text_blind_watermark (文本盲水印，把信息隐秘地打入文本): [https://github.com/guofei9987/text_blind_watermark](https://github.com/guofei9987/text_blind_watermark)  
 - HideInfo（藏物于图、藏物于音、藏图于文）：[https://github.com/guofei9987/HideInfo](https://github.com/guofei9987/HideInfo)
+# 水印嵌入测试工具
+
+这个项目提供了一组工具，用于测试不同分辨率图像嵌入不同长度文本的水印效果，并生成图像分辨率与可嵌入文本长度的关系模型。
+
+## 主要功能
+
+1. **批量测试不同分辨率图像嵌入不同长度文本的错误率**
+2. **可视化测试结果，包括错误率与文本长度、图像分辨率的关系**
+3. **自动生成推荐公式，用于预测图像能够安全嵌入的最大文本长度**
+4. **提供单独的预测工具，快速计算图像可嵌入的安全文本长度**
+
+## 文件说明
+
+- `watermark_resolution_test.py`: 主要测试脚本，包含测试、分析和可视化相关函数
+- `run_watermark_test.py`: 简化版测试脚本，调用主脚本进行测试
+- `watermark_prediction.py`: 独立的预测工具，根据训练结果预测图像可嵌入的最大文本长度
+
+## 使用方法
+
+### 1. 运行测试
+
+执行以下命令运行默认测试：
+
+```bash
+python run_watermark_test.py
+```
+
+这将使用预定义的图像和文本长度进行测试，结果保存在 `watermark_test_results` 目录中。
+
+### 2. 查看分析结果
+
+测试完成后，可以在 `watermark_test_results` 目录中找到以下文件：
+
+- `watermark_test_results.csv`: 所有测试结果的CSV文件
+- `max_viable_text_length.csv`: 每个图像的最大可用文本长度
+- `recommendation_formula.txt`: 生成的推荐公式
+- `error_rate_by_text_length.png`: 错误率与文本长度关系图
+- `max_length_by_resolution.png`: 最大可用文本长度与图像分辨率关系图
+- `safe_length_prediction.png`: 推荐公式拟合效果图
+
+### 3. 使用预测工具
+
+通过以下命令可以预测指定图像能够安全嵌入的最大文本长度：
+
+```bash
+python watermark_prediction.py --images image1.jpg image2.png --ratio 0.01 --output predictions
+```
+
+参数说明：
+- `--images`: 需要预测的图像路径，可以指定多个
+- `--ratio`: 每像素可安全嵌入的字符数，默认为0.01（即每100像素可嵌入1个字符）
+- `--output`: 输出目录，默认为 'watermark_predictions'
+
+## 注意事项
+
+1. 测试过程可能比较耗时，尤其是对于高分辨率图像和长文本
+2. 推荐公式是基于测试数据拟合的，实际效果可能会有差异
+3. 建议针对特定场景进行测试，以获得更准确的推荐值
+
+## 示例
+
+以下是典型的测试流程：
+
+1. 修改 `run_watermark_test.py` 中的测试图像和文本长度
+2. 运行测试脚本生成测试结果
+3. 根据生成的推荐公式更新 `watermark_prediction.py` 中的默认 `safe_ratio` 值
+4. 使用预测工具快速估算新图像的安全文本长度
