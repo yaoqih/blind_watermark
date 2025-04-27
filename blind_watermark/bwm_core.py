@@ -15,7 +15,7 @@ class WaterMarkCore:
     def __init__(self, password_img=1, mode='common', processes=None):
         self.block_shape = np.array([4, 4])
         self.password_img = password_img
-        self.d1, self.d2 = 36, 20  # d1/d2 越大鲁棒性越强,但输出图片的失真越大
+        self.d1, self.d2 = 15, 20  # d1/d2 越大鲁棒性越强,但输出图片的失真越大
 
         # init data
         self.img, self.img_YUV = None, None  # self.img 是原图，self.img_YUV 对像素做了加白偶数化

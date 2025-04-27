@@ -11,7 +11,7 @@ from .bwm_core import WaterMarkCore
 from .version import bw_notes
 import zlib
 import reedsolo
-from PIL import Image
+from PIL import Image, PngImagePlugin
 
 class WaterMark:
     def __init__(self, password_wm=1, password_img=1, block_shape=(4, 4), mode='common', processes=None):
@@ -149,7 +149,7 @@ class WaterMark:
         # 截取到指定长度
         return int_array[0]
     
-    def embed_text(self, text, filename=None, out_filename=None, use_metadata=True, img=None, return_bytes=False):
+    def embed_text(self, text, filename=None, out_filename=None, use_metadata=True, img=None, return_bytes=False, only_meta_data=False):
         """
         在图像中嵌入文本水印
         
@@ -160,6 +160,7 @@ class WaterMark:
         use_metadata: bool - 是否在图像元数据中也存储水印信息
         img: PIL.Image 或 numpy.ndarray - 输入图像对象（优先于filename）
         return_bytes: bool - 是否返回图像字节数据(True)或numpy数组(False)
+        only_meta_data: bool - 如果为True，则只嵌入元数据而不嵌入像素水印
         
         返回:
         bytes或numpy.ndarray - 根据return_bytes参数返回不同类型的嵌入水印后的图像
@@ -185,54 +186,56 @@ class WaterMark:
         # 确保图像已正确加载
         assert numpy_img is not None, "无法读取图像"
         
-        # 计算安全水印长度
-        pixel_num = numpy_img.shape[0] * numpy_img.shape[1]
-        safe_bit_num = int((pixel_num * 0.0025 + 190) * 0.9)
-        
         # 1. 将文本转换为字节
         text_bytes = text.encode('utf-8')
         
         # 2. 使用zlib进行压缩
         compressed_data = zlib.compress(text_bytes, level=9)
         
-        # 3. 应用Reed-Solomon编码添加纠错能力
-        rs_encoded = self.rs_coder.encode(compressed_data)
+        embed_img = numpy_img # 默认使用原图，除非进行像素嵌入
         
-        # 4. 转换为位数组
-        bit_string = ''
-        for byte in rs_encoded:
-            # 将每个字节转换为8位二进制
-            bits = format(byte, '08b')
-            bit_string += bits
+        if not only_meta_data:
+            # 计算安全水印长度
+            pixel_num = numpy_img.shape[0] * numpy_img.shape[1]
+            safe_bit_num = int((pixel_num * 0.0025 + 190) * 0.9)
+            
+            # 3. 应用Reed-Solomon编码添加纠错能力
+            rs_encoded = self.rs_coder.encode(compressed_data)
+            
+            # 4. 转换为位数组
+            bit_string = ''
+            for byte in rs_encoded:
+                # 将每个字节转换为8位二进制
+                bits = format(byte, '08b')
+                bit_string += bits
+            
+            # 5. 转换为NumPy数组
+            wm_bit = (np.array(list(bit_string)) == '1')
+            if len(wm_bit) > safe_bit_num - 32:
+                raise ValueError(f"水印长度超过安全阈值，请调整水印长度,当前水印长度为：{len(wm_bit)}，安全阈值为：{safe_bit_num-32}")
+            
+            wm_all = wm_bit.tolist() + [0] * (safe_bit_num - len(wm_bit) - 32) + WaterMark.encode_int32_array([len(wm_bit)]).tolist()
+            
+            # 使用已读取的图像数组而不是再次读取文件
+            self.bwm_core.read_img_arr(img=numpy_img)
+            self.read_wm(wm_all, mode='bit')
+            
+            # 嵌入水印到像素
+            embed_img = self.embed()
         
-        # 5. 转换为NumPy数组
-        wm_bit = (np.array(list(bit_string)) == '1')
-        if len(wm_bit) > safe_bit_num - 32:
-            raise ValueError(f"水印长度超过安全阈值，请调整水印长度,当前水印长度为：{len(wm_bit)}，安全阈值为：{safe_bit_num-32}")
-        
-        wm_all = wm_bit.tolist() + [0] * (safe_bit_num - len(wm_bit) - 32) + WaterMark.encode_int32_array([len(wm_bit)]).tolist()
-        
-        # 使用已读取的图像数组而不是再次读取文件
-        self.bwm_core.read_img_arr(img=numpy_img)
-        self.read_wm(wm_all, mode='bit')
-        
-        # 嵌入水印
-        embed_img = self.embed()
-        
-        # 准备元数据
+        # 准备元数据 (即使only_meta_data=True也要准备)
         import base64
         metadata_text = base64.b64encode(compressed_data).decode('ascii')
         
         # 根据需要返回带元数据的字节数据或保存到文件
-        if return_bytes or out_filename is not None:
+        if use_metadata and (return_bytes or out_filename is not None):
             import io
-            # 确保图像数据类型正确
+            # 确保图像数据类型正确 (使用 embed_img，它可能是原图或修改后的图)
             embed_img_uint8 = np.clip(embed_img, 0, 255).astype(np.uint8)
             pil_image = Image.fromarray(cv2.cvtColor(embed_img_uint8, cv2.COLOR_BGR2RGB))
             
             # 添加元数据
-            if use_metadata:
-                pil_image.info['watermark'] = metadata_text
+            pil_image.info['watermark'] = metadata_text
             
             # 确定图像格式
             if out_filename is not None:
@@ -273,25 +276,34 @@ class WaterMark:
                         # 保存修改后的EXIF数据
                         exif_bytes = piexif.dump(exif_dict)
                         piexif.insert(exif_bytes, out_filename)
-                        print(f"水印已同时嵌入图像的像素和EXIF元数据中")
+                        print(f"水印已同时嵌入图像的像素和EXIF元数据中" if not only_meta_data else f"水印已嵌入图像的EXIF元数据中")
                     except ImportError:
                         print("警告：未安装piexif库，无法在JPEG中添加元数据水印，仅保留像素水印")
                         print("安装方法：pip install piexif")
             else:
                 # 对于PNG和其他支持标准元数据的格式
-                pil_image.save(byte_io, format=img_format)
+                # Create PngInfo object to explicitly pass metadata
+                png_info = PngImagePlugin.PngInfo()
+                png_info.add_text('watermark', metadata_text)
+                
+                # Save to memory with explicit pnginfo
+                pil_image.save(byte_io, format=img_format, pnginfo=png_info)
                 
                 # 如果需要保存到文件
                 if out_filename is not None:
-                    pil_image.save(out_filename)
+                    # Save to file with explicit pnginfo
+                    pil_image.save(out_filename, pnginfo=png_info)
                     if use_metadata:
-                        print(f"水印已同时嵌入图像的像素和元数据中")
+                         print(f"水印已同时嵌入图像的像素和元数据中" if not only_meta_data else f"水印已嵌入图像的元数据中")
                     
             # 如果需要返回字节，获取字节数据并返回
             if return_bytes:
                 return byte_io.getvalue()
         
-        # 默认返回numpy数组
+        # 如果仅嵌入元数据，但不需要返回字节或保存文件，则原始numpy数组可能已经满足要求
+        # 但为了统一，如果use_metadata为False，或者既不返回字节也不保存文件，则返回处理过的embed_img
+        # 如果use_metadata为True且进行了保存或需要字节返回，则之前的if块已经处理并返回
+        # 此处返回适用于不使用元数据或仅在内存中操作的场景
         return embed_img
     
     def extract_text(self, filename=None, check_metadata=True, img=None):
@@ -318,6 +330,7 @@ class WaterMark:
                     
                     # 尝试打开图像并检查是否有水印元数据
                     with Image.open(filename) as pil_img:
+                        # print(f"DEBUG: After PNG open in extract_text, pil_img.info: {pil_img.info}") # Removed debug print
                         if 'watermark' in pil_img.info:
                             # 从元数据中提取并解码水印
                             metadata_text = pil_img.info['watermark']
